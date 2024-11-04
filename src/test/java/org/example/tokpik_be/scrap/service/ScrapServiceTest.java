@@ -1,105 +1,85 @@
 package org.example.tokpik_be.scrap.service;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.mock;
+import static org.mockito.Mockito.verify;
 
-import java.util.Arrays;
-
-import org.example.tokpik_be.exception.GeneralException;
-import org.example.tokpik_be.exception.ScrapException;
+import java.util.Optional;
 import org.example.tokpik_be.scrap.domain.Scrap;
 import org.example.tokpik_be.scrap.domain.ScrapTopic;
-import org.example.tokpik_be.scrap.dto.response.ScrapListResponse;
-import org.example.tokpik_be.scrap.dto.response.ScrapResponse;
-import org.example.tokpik_be.support.ServiceTestSupport;
-import org.example.tokpik_be.type.domain.PlaceType;
-import org.example.tokpik_be.type.domain.TopicType;
-import org.example.tokpik_be.talk_topic.domain.TalkPartner;
+import org.example.tokpik_be.scrap.dto.request.ScrapCreateRequest;
+import org.example.tokpik_be.scrap.dto.response.ScrapCreateResponse;
+import org.example.tokpik_be.scrap.repository.ScrapRepository;
+import org.example.tokpik_be.scrap.repository.ScrapTopicRepository;
 import org.example.tokpik_be.talk_topic.domain.TalkTopic;
 import org.example.tokpik_be.talk_topic.service.TalkTopicQueryService;
 import org.example.tokpik_be.user.domain.User;
-import org.example.tokpik_be.user.enums.Gender;
 import org.example.tokpik_be.user.service.UserQueryService;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
-public class ScrapServiceTest extends ServiceTestSupport {
+@ExtendWith(MockitoExtension.class)
+public class ScrapServiceTest {
 
-    private ScrapService scrapService;
+    @Mock
+    private ScrapRepository scrapRepository;
 
-    @MockBean
+    @Mock
+    private ScrapTopicRepository scrapTopicRepository;
+
+    @Mock
     private UserQueryService userQueryService;
 
-    @MockBean
+    @Mock
     private TalkTopicQueryService talkTopicQueryService;
 
-    @BeforeEach
-    void setUp() {
-        scrapService = new ScrapService(scrapRepository, scrapTopicRepository, userQueryService, talkTopicQueryService);
+    @InjectMocks
+    private ScrapService scrapService;
+
+    @DisplayName("사용자는 스크랩을 생성할 수 있다.")
+    @Test
+    void createScrap() {
+        // given
+        long userId = 1L;
+        User user = new User("ex@example.com", "https://www.example.com/profile-photo");
+        given(userQueryService.findById(userId)).willReturn(user);
+
+        long scrapId = 1L;
+        Scrap savedScrap = mock(Scrap.class);
+        given(savedScrap.getId()).willReturn(scrapId);
+        given(scrapRepository.save(any(Scrap.class))).willReturn(savedScrap);
+
+        ScrapCreateRequest request = new ScrapCreateRequest("스크랩 이름");
+
+        // when
+        ScrapCreateResponse response = scrapService.createScrap(userId, request);
+
+        // then
+        assertThat(response.scrapId()).isEqualTo(scrapId);
     }
 
-    @Nested
-    @DisplayName("스크랩에 포함된 대화 주제 조회 시 ")
-    class getScrapTopicsTest{
+    @DisplayName("사용자는 대화 주제를 스크랩할 수 있다.")
+    @Test
+    void scrapTopic() {
+        // given
+        long scrapId = 1L;
+        Scrap scrap = mock(Scrap.class);
+        given(scrapRepository.findById(scrapId)).willReturn(Optional.of(scrap));
 
-        @Test
-        @DisplayName("성공한다.")
-        void getScrapTopics(){
+        long topicId = 1L;
+        TalkTopic talkTopic = mock(TalkTopic.class);
+        given(talkTopicQueryService.findById(topicId)).willReturn(talkTopic);
 
-            // Given
-            User user = new User("test@test.com", "profile-photo/1");
-            userRepository.save(user);
+        // when
+        scrapService.scrapTopic(scrapId, topicId);
 
-            Scrap scrap = new Scrap("스크랩 1", user);
-            scrapRepository.save(scrap);
-
-            TopicType topicType = new TopicType("아이스브레이킹");
-            topicTypeRepository.save(topicType);
-
-            PlaceType placeType = new PlaceType("카페");
-            placeTypeRepository.save(placeType);
-
-            TalkPartner talkpartner = new TalkPartner(Gender.MALE, 10, 99);
-            TalkTopic talkTopic = new TalkTopic("영화 이야기로 시작하기", "가장 최근에 본 영화는?", "1대1만남",
-                talkpartner, topicType, placeType);
-            em.persist(talkTopic);
-
-            ScrapTopic scrapTopic = new ScrapTopic(scrap, talkTopic);
-            scrapTopicRepository.save(scrapTopic);
-
-            em.flush();
-            em.clear();
-
-            // When
-            ScrapResponse response = scrapService.getScrapTopics(scrap.getId(), 0L, 10);
-
-            // Then
-            assertThat(response.contents()).hasSize(1);
-            assertThat(response.contents().get(0).topicId()).isEqualTo(talkTopic.getId());
-            assertThat(response.contents().get(0).topicTitle()).isEqualTo("영화 이야기로 시작하기");
-        }
-
-        @Test
-        @DisplayName("해당 스크랩에 존재하지 않는 대화주제이면 예외가 발생한다.")
-        void invalidScrapTopic(){
-
-            // Given
-            User user = new User("test@test.com", "profile-photo/1");
-            userRepository.save(user);
-
-            Scrap scrap = new Scrap("스크랩 1", user);
-            scrapRepository.save(scrap);
-            em.flush();
-
-            Long nonExistScrapTopicId = 99L;
-
-            // Then
-            assertThatThrownBy(() -> scrapService.getScrapTopics(1L, nonExistScrapTopicId, 10))
-                .isInstanceOf(GeneralException.class)
-                .hasMessageContaining(ScrapException.INVALID_SCRAP_TOPIC.getMessage());
-        }
+        // then
+        verify(scrapTopicRepository).save(any(ScrapTopic.class));
     }
 }

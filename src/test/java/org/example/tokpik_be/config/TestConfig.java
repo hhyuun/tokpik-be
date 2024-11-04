@@ -10,14 +10,19 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 
 @TestConfiguration
 public class TestConfig {
+
     @MockBean
     private OpenAiModerationModel openAiModerationModel;
+
     @MockBean
     private OpenAiAudioTranscriptionModel openAiAudioTranscriptionModel;
+
     @MockBean
     private OpenAiImageModel openAiImageModel;
+
     @MockBean
     private OpenAiEmbeddingModel openAiEmbeddingModel;
+
     @MockBean
     private OpenAiAudioSpeechModel openAiAudioSpeechModel;
 }
