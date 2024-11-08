@@ -1,5 +1,6 @@
 package org.example.tokpik_be.notification.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -24,12 +25,15 @@ public record NotificationsResponse(
         long notificationId,
 
         @Schema(type = "string", description = "알림 일자", example = "2024-09-11")
+        @JsonFormat(pattern = "yyyy-MM-dd")
         LocalDate noticeDate,
 
         @Schema(type = "string", description = "알림 시작 시간", example = "09:00")
+        @JsonFormat(pattern = "HH:mm")
         LocalTime notificationStartTime,
 
         @Schema(type = "string", description = "알림 종료 시간", example = "10:00")
+        @JsonFormat(pattern = "HH:mm")
         LocalTime notificationEndTime,
 
         @Schema(type = "number", description = "알림 간격(분 단위)", example = "30")
@@ -38,7 +42,7 @@ public record NotificationsResponse(
         @Schema(type = "string", description = "알림 이름", example = "부장님 개그 모음")
         String notificationName,
 
-        @Schema(type = "number", description = "스크랩에 저장된 대화 주제 합계", example = "30")
+        @Schema(type = "number", description = "알림 지정된 대화 주제 합계", example = "30")
         long notificationTopicTotal,
 
         @Schema(type = "array", description = "알림 지정 순서에 따른 첫 네 대화 주제 종류들")
