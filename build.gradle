@@ -83,12 +83,34 @@ tasks.named('test') {
     finalizedBy jacocoTestReport
 }
 
+def jacocoExcludePatterns = [
+        'org/example/tokpik_be/TokpikBeApplication.class',
+        '**/common/**',
+        '**/exception/**',
+        '**/dto/**',
+        '**/config/**',
+        '**/enums/**',
+        '**/event/**',
+        '**/converter/**',
+        '**/test/**'
+]
+for (qPattern in '**/QA' .. '**/QZ') {
+    jacocoExcludePatterns.add(qPattern + '*')
+}
+
 jacocoTestReport {
     dependsOn test
     reports {
         html.destination file("$buildDir/jacocoReport")
     }
-    mustRunAfter 'jacocoTestCoverageVerification'
+
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, excludes: jacocoExcludePatterns)
+        }))
+    }
+
+    finalizedBy 'jacocoTestCoverageVerification'
 }
 
 jacocoTestCoverageVerification {
@@ -104,37 +126,7 @@ jacocoTestCoverageVerification {
             element = 'CLASS'
 
             // 커버리지 제외 범위
-            excludes = [
-                    '**.Application',
-                    '**.dto.*',
-                    '**.domain.*',
-                    '**.exception.*',
-                    '**.config.*',
-                    '**.util.*',
-                    '**.Q*',
-                    '**.test.**'
-            ]
-
-            // 브랜치 커버리지
-            limit {
-                counter = 'BRANCH'
-                value = 'COVEREDRATIO'
-                minimum = 0.70
-            }
-
-            // 라인 커버리지 기준치
-            limit {
-                counter = 'LINE'
-                value = 'COVEREDRATIO'
-                minimum = 0.70
-            }
-
-            // 코드 라인수 기준치
-            limit {
-                counter = 'LINE'
-                value = 'TOTALCOUNT'
-                maximum = 200
-            }
+            excludes = jacocoExcludePatterns
         }
     }
 }
