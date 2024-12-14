@@ -18,6 +18,7 @@ import org.example.tokpik_be.scrap.dto.response.ScrapCountResponse;
 import org.example.tokpik_be.scrap.dto.response.ScrapCreateResponse;
 import org.example.tokpik_be.scrap.dto.response.ScrapListResponse;
 import org.example.tokpik_be.scrap.dto.response.ScrapResponse;
+import org.example.tokpik_be.scrap.repository.QueryDslScrapRepository;
 import org.example.tokpik_be.scrap.repository.ScrapRepository;
 import org.example.tokpik_be.scrap.repository.ScrapTopicRepository;
 import org.example.tokpik_be.talk_topic.domain.TalkTopic;
@@ -48,6 +49,9 @@ public class ScrapServiceTest {
 
     @Mock
     private TalkTopicQueryService talkTopicQueryService;
+
+    @Mock
+    private QueryDslScrapRepository queryDslScrapRepository;
 
     @InjectMocks
     private ScrapService scrapService;
@@ -92,7 +96,7 @@ public class ScrapServiceTest {
         // then
         verify(scrapTopicRepository).save(any(ScrapTopic.class));
     }
-    
+
     @DisplayName("스크랩 목록을 조회할 수 있다.")
     @Test
     void getScraps() {
@@ -122,9 +126,9 @@ public class ScrapServiceTest {
         List<ScrapTopic> scrapTopicsForScrap1 = List.of(scrapTopics.get(0), scrapTopics.get(1));
         List<ScrapTopic> scrapTopicsForScrap2 = List.of(scrapTopics.get(2), scrapTopics.get(3));
 
-        given(scrapRepository.findByUserOrderByCreatedAtDesc(user)).willReturn(scraps);
-        given(scrapTopicRepository.findByScrapOrderByCreatedAtDesc(scraps.get(0))).willReturn(scrapTopicsForScrap1);
-        given(scrapTopicRepository.findByScrapOrderByCreatedAtDesc(scraps.get(1))).willReturn(scrapTopicsForScrap2);
+        given(queryDslScrapRepository.findScrapBy(user)).willReturn(scraps);
+        given(queryDslScrapRepository.findScrapTopicBy(scraps.get(0))).willReturn(scrapTopicsForScrap1);
+        given(queryDslScrapRepository.findScrapTopicBy(scraps.get(1))).willReturn(scrapTopicsForScrap2);
 
         // when
         ScrapListResponse response = scrapService.getScraps(userId);
@@ -174,9 +178,10 @@ public class ScrapServiceTest {
                 new ScrapTopic(scrap, talkTopics.get(0)),
                 new ScrapTopic(scrap, talkTopics.get(1)));
 
-            given(scrapTopicRepository.findByScrapIdAndIdGreaterThanOrderByIdAsc(scrapId, nextCursorId, PageRequest.of(0, size)))
+            given(queryDslScrapRepository.findScrapTopicByCursor(scrapId, nextCursorId, PageRequest.of(0, size)))
                 .willReturn(scrapTopics);
-            given(scrapTopicRepository.existsByScrapIdAndId(scrapId, nextCursorId)).willReturn(true);
+            given(queryDslScrapRepository.existsBy(scrapId, nextCursorId))
+                .willReturn(true);
 
             // when
             ScrapResponse response = scrapService.getScrapTopics(scrapId, nextCursorId, size);
@@ -214,14 +219,12 @@ public class ScrapServiceTest {
             long invalidNextCursorId = 999L;
             int size = 3;
 
-            given(scrapRepository.findById(scrapId)).willReturn(Optional.of(scrap));
-            given(scrapTopicRepository.existsByScrapIdAndId(scrapId, invalidNextCursorId)).willReturn(false);
+            given(queryDslScrapRepository.existsBy(scrapId, invalidNextCursorId)).willReturn(false);
 
             // when & then
             assertThatThrownBy(() -> scrapService.getScrapTopics(scrapId, invalidNextCursorId, size))
                 .isInstanceOf(GeneralException.class)
-                .extracting("exception")
-                .isEqualTo(ScrapException.INVALID_SCRAP_TOPIC);
+				.hasMessageContaining(ScrapException.INVALID_SCRAP_TOPIC.getMessage());
         }
     }
 
@@ -233,7 +236,7 @@ public class ScrapServiceTest {
         User user = new User("ex@example.com", "https://www.example.com/profile-photo");
         given(userQueryService.findById(userId)).willReturn(user);
 
-        given(scrapRepository.countByUser(user)).willReturn(10L);
+        given(queryDslScrapRepository.countScrapBy(user)).willReturn(10L);
 
         // when
         ScrapCountResponse response = scrapService.getUserScrapCount(userId);
@@ -250,7 +253,7 @@ public class ScrapServiceTest {
         User user = new User("ex@example.com", "https://www.example.com/profile-photo");
         given(userQueryService.findById(userId)).willReturn(user);
 
-        given(scrapTopicRepository.countByUserId(userId)).willReturn(20L);
+        given(queryDslScrapRepository.countScrapTopicBy(user)).willReturn(20L);
 
         // when
         ScrapCountResponse response = scrapService.getUserTopicCount(userId);

@@ -12,6 +12,7 @@ import org.example.tokpik_be.scrap.dto.response.ScrapCountResponse;
 import org.example.tokpik_be.scrap.dto.response.ScrapCreateResponse;
 import org.example.tokpik_be.scrap.dto.response.ScrapListResponse;
 import org.example.tokpik_be.scrap.dto.response.ScrapResponse;
+import org.example.tokpik_be.scrap.repository.QueryDslScrapRepository;
 import org.example.tokpik_be.scrap.repository.ScrapRepository;
 import org.example.tokpik_be.scrap.repository.ScrapTopicRepository;
 import org.example.tokpik_be.talk_topic.domain.TalkTopic;
@@ -31,12 +32,13 @@ public class ScrapService {
     private final ScrapTopicRepository scrapTopicRepository;
     private final UserQueryService userQueryService;
     private final TalkTopicQueryService talkTopicQueryService;
+    private final QueryDslScrapRepository queryDslScrapRepository;
 
     public ScrapListResponse getScraps(long userId) {
 
         User user = userQueryService.findById(userId);
 
-        List<Scrap> scraps = scrapRepository.findByUserOrderByCreatedAtDesc(user);
+        List<Scrap> scraps = queryDslScrapRepository.findScrapBy(user);
 
         List<ScrapListResponse.ScrapResponse> scrapResponses = scraps.stream()
             .map(this::mapToScrapResponse)
@@ -46,7 +48,7 @@ public class ScrapService {
     }
 
     private ScrapListResponse.ScrapResponse mapToScrapResponse(Scrap scrap) {
-        List<ScrapTopic> scrapTopics = scrapTopicRepository.findByScrapOrderByCreatedAtDesc(scrap);
+        List<ScrapTopic> scrapTopics = queryDslScrapRepository.findScrapTopicBy(scrap);
 
         List<ScrapListResponse.TopicTypeResponse> topicTypes = scrapTopics.stream()
             .map(this::mapToTopicTypeResponse)
@@ -71,7 +73,7 @@ public class ScrapService {
 
         User user = userQueryService.findById(userId);
 
-        Long count = scrapRepository.countByUser(user);
+        Long count = queryDslScrapRepository.countScrapBy(user);
 
         return new ScrapCountResponse(count);
     }
@@ -80,7 +82,7 @@ public class ScrapService {
 
         User user = userQueryService.findById(userId);
 
-        Long count = scrapTopicRepository.countByUserId(userId);
+        Long count = queryDslScrapRepository.countScrapTopicBy(user);
 
         return new ScrapCountResponse(count);
     }
@@ -137,13 +139,15 @@ public class ScrapService {
 
     public ScrapResponse getScrapTopics(Long scrapId, Long nextCursorId, int size) {
 
-        Scrap scrap = findById(scrapId);
+        Scrap scrap = scrapRepository.findById(scrapId)
+            .orElseThrow(() -> new GeneralException(ScrapException.SCRAP_NOT_FOUND));
 
         validNextCursorId(scrapId, nextCursorId);
 
         Pageable pageable = PageRequest.of(0, size);
-        List<ScrapTopic> scrapTopics = scrapTopicRepository
-            .findByScrapIdAndIdGreaterThanOrderByIdAsc(scrapId, nextCursorId, pageable);
+
+        List<ScrapTopic> scrapTopics = queryDslScrapRepository
+            .findScrapTopicByCursor(scrapId, nextCursorId, pageable);
 
         List<ScrapResponse.ScrapTopicResponse> contents = mapToScrapTopicResponses(scrapId, scrapTopics);
 
@@ -157,7 +161,7 @@ public class ScrapService {
 
     public void validNextCursorId(Long scrapId, Long nextCursorId) {
         if (nextCursorId != null && nextCursorId > 0) {
-            boolean isValidNextCursorId = scrapTopicRepository.existsByScrapIdAndId(scrapId, nextCursorId);
+            boolean isValidNextCursorId = queryDslScrapRepository.existsBy(scrapId, nextCursorId);
             if (!isValidNextCursorId) {
                 throw new GeneralException(ScrapException.INVALID_SCRAP_TOPIC);
             }
@@ -165,7 +169,7 @@ public class ScrapService {
     }
 
     private boolean isTopicScraped(Long scrapId, Long topicId) {
-        return scrapRepository.existsByIdAndScrapTopicsTalkTopicId(scrapId, topicId);
+        return queryDslScrapRepository.checkIsTopicScraped(scrapId, topicId);
     }
 
     public Long getNewNextCursorId(List<ScrapResponse.ScrapTopicResponse> contents, Long nextCursorId, List<ScrapTopic> scrapTopics) {
@@ -176,7 +180,7 @@ public class ScrapService {
         if (nextCursorId == null || nextCursorId == 0) {
             return true;
         } else {
-            long countAfterNextCursor = scrapTopicRepository.countByScrapIdAndIdGreaterThan(scrapId, nextCursorId);
+            long countAfterNextCursor = queryDslScrapRepository.countScrapTopicByCursor(scrapId, nextCursorId);
             return countAfterNextCursor == 0;
         }
     }
